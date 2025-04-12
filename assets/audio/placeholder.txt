@@ -1,0 +1,10 @@
+This directory contains placeholder files for game audio assets.
+
+In a production environment, you would replace these with actual audio files like:
+
+- background_music.mp3 - Background game music
+- unit_spawn.wav - Sound when a unit is spawned
+- unit_attack.wav - Sound when units attack each other
+- unit_death.wav - Sound when a unit is destroyed
+- powerup_activate.wav - Sound when a powerup is activated
+- game_over.wav - Sound when the game ends

@@ -1,0 +1,18 @@
+This directory contains placeholder files for game assets.
+
+In a production environment, you would replace these with actual game assets like:
+
+- background.png - Game background
+- castle.png - Castle sprite
+- barracks_spritesheet.png - Barracks spritesheet with frames for rock, paper, scissors barracks
+- status_indicator.png - Status indicator for barracks (active/inactive/cooldown)
+- rock_spritesheet.png - Rock unit animations
+- paper_spritesheet.png - Paper unit animations
+- scissors_spritesheet.png - Scissors unit animations
+- button.png - UI button
+- button_pressed.png - UI button pressed state
+- coin.png - Coin icon
+- reverser_icon.png - Reverser powerup icon
+- flooder_icon.png - Flooder powerup icon
+- loading_background.png - Loading screen background
+- loading_bar.png - Loading progress bar

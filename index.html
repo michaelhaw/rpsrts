@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rock Paper Scissors RTS</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="game"></div>
+    </div>
+    
+    <!-- Load Phaser -->
+    <script src="node_modules/phaser/dist/phaser.min.js"></script>
+    
+    <!-- Load game scripts -->
+    <script src="js/constants.js"></script>
+    <script src="js/classes/Unit.js"></script>
+    <script src="js/classes/Barrack.js"></script>
+    <script src="js/classes/Castle.js"></script>
+    <script src="js/classes/Player.js"></script>
+    <script src="js/managers/MultiplayerManager.js"></script>
+    <script src="js/scenes/BootScene.js"></script>
+    <script src="js/scenes/PreloadScene.js"></script>
+    <script src="js/scenes/MainMenuScene.js"></script>
+    <script src="js/scenes/GameScene.js"></script>
+    <script src="js/scenes/UIScene.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
