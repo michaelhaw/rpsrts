@@ -12,7 +12,8 @@ class MultiplayerManager {
     connect() {
         // Connect to the WebSocket server
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const port = process.env.NODE_ENV === 'production' ? '' : ':3000';
+        const isProduction = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+        const port = isProduction ? '' : ':3000';
         const wsUrl = `${protocol}//${window.location.hostname}${port}`;
         
         this.ws = new WebSocket(wsUrl);
