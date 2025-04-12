@@ -4,6 +4,38 @@ class GameScene extends Phaser.Scene {
     }
 
     create() {
+        // Initialize multiplayer
+        this.multiplayer = window.multiplayerManager;
+        this.multiplayer.on('playerAssigned', this.handlePlayerAssigned.bind(this));
+        this.multiplayer.on('gameStart', this.handleGameStart.bind(this));
+        this.multiplayer.on('gameAction', this.handleGameAction.bind(this));
+        this.multiplayer.on('opponentDisconnected', this.handleOpponentDisconnected.bind(this));
+
+        // Initialize game state
+        this.gameState = {
+            advantageFlipped: false,
+            playerData: {
+                player1: {
+                    coins: 15,
+                    activeBarracks: 0,
+                    powerupCooldowns: {
+                        reverser: 0,
+                        flooder: 0
+                    },
+                    flooderActive: false
+                },
+                player2: {
+                    coins: 15,
+                    activeBarracks: 0,
+                    powerupCooldowns: {
+                        reverser: 0,
+                        flooder: 0
+                    },
+                    flooderActive: false
+                }
+            }
+        };
+
         // Reset game state
         this.resetGameState();
         
@@ -32,8 +64,8 @@ class GameScene extends Phaser.Scene {
     
     resetGameState() {
         // Reset the global game state
-        gameState.advantageFlipped = false;
-        gameState.playerData = {
+        this.gameState.advantageFlipped = false;
+        this.gameState.playerData = {
             player1: {
                 coins: 15,
                 activeBarracks: 0,
@@ -160,6 +192,100 @@ class GameScene extends Phaser.Scene {
         }
     }
     
+    handlePlayerAssigned(data) {
+        this.playerSide = data.side;
+        this.opponentSide = data.opponentSide;
+        console.log(`Assigned to ${this.playerSide} side`);
+    }
+
+    handleGameStart() {
+        this.gameStarted = true;
+        console.log('Game started');
+    }
+
+    handleGameAction(action) {
+        if (!this.gameStarted) return;
+
+        switch (action.type) {
+            case 'toggleBarrack':
+                this.toggleBarrack(action.barrackId);
+                break;
+
+            case 'usePowerup':
+                this.usePowerup(action.powerupType);
+                break;
+
+            case 'unitKilled':
+                this.handleUnitKilled(action.side);
+                break;
+
+            case 'gameOver':
+                this.gameOver(action.winner);
+                break;
+        }
+    }
+
+    handleOpponentDisconnected() {
+        this.gameStarted = false;
+        this.gameState = null;
+        this.multiplayer = null;
+        console.log('Opponent disconnected');
+    }
+
+    toggleBarrack(barrackId) {
+        const barrack = this.barracks[barrackId];
+        if (barrack) {
+            barrack.toggle();
+            // Send toggle action to server
+            this.multiplayer.toggleBarrack(barrackId);
+        }
+    }
+
+    usePowerup(powerupType) {
+        const playerData = this.gameState.playerData;
+        const powerupCosts = {
+            reverser: 10,
+            flooder: 15
+        };
+
+        // Check if player has enough coins
+        if (playerData[this.playerSide].coins >= powerupCosts[powerupType]) {
+            // Apply powerup effect
+            switch (powerupType) {
+                case 'reverser':
+                    this.gameState.advantageFlipped = !this.gameState.advantageFlipped;
+                    break;
+                case 'flooder':
+                    // Increase unit generation rate for 5 seconds
+                    this.flooderActive = true;
+                    this.time.delayedCall(5000, () => {
+                        this.flooderActive = false;
+                    });
+                    break;
+            }
+
+            // Deduct coins and update cooldown
+            playerData[this.playerSide].coins -= powerupCosts[powerupType];
+            playerData[this.playerSide].powerupCooldowns[powerupType] = 10; // 10-second cooldown
+
+            // Send powerup usage to server
+            this.multiplayer.usePowerup(powerupType);
+        }
+    }
+
+    handleUnitKilled(side) {
+        // Award coin to the player who killed the unit
+        this.gameState.playerData[side].coins += 1;
+        // Send kill report to server
+        this.multiplayer.reportUnitKilled(side);
+    }
+
+    gameOver(winner) {
+        this.gameStarted = false;
+        this.scene.pause();
+        this.scene.launch('GameOverScene', { winner });
+    }
+
     onGameOver(winner) {
         // Audio is disabled, so we don't play game over sound
         

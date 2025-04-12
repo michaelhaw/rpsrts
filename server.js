@@ -10,7 +10,7 @@ const wss = new WebSocket.Server({ server });
 // Serve static files from the current directory
 app.use(express.static(__dirname));
 
-// Keep track of connected players
+// Keep track of connected players and their states
 const players = new Map();
 let waitingPlayer = null;
 
@@ -31,8 +31,9 @@ wss.on('connection', (ws) => {
     const playerId = players.size === 0 ? 'player1' : 'player2';
     players.set(ws, playerId);
 
-    // Send player their assigned ID
-    ws.send(JSON.stringify({ type: 'init', playerId }));
+    // Send player their assigned ID and side
+    const side = playerId === 'player1' ? 'left' : 'right';
+    ws.send(JSON.stringify({ type: 'init', playerId, side }));
 
     // If this is player 1, wait for player 2
     if (playerId === 'player1') {
@@ -80,30 +81,10 @@ wss.on('connection', (ws) => {
             if (data.type === 'gameAction') {
                 const { action } = data;
                 
-                switch (action.type) {
-                    case 'toggleBarrack':
-                    case 'usePowerup':
-                        // Forward these actions directly to opponent
-                        opponent.send(JSON.stringify(data));
-                        break;
-
-                    case 'unitKilled':
-                        // Award a coin to the killer
-                        opponent.send(JSON.stringify(data));
-                        break;
-
-                    case 'gameOver':
-                        // End the game and notify both players
-                        const winMessage = JSON.stringify({
-                            type: 'gameAction',
-                            action: {
-                                type: 'gameOver',
-                                winner: players.get(ws)
-                            }
-                        });
-                        ws.send(winMessage);
-                        opponent.send(winMessage);
-                        break;
+                // Only process actions from the correct side
+                if (action.side === players.get(ws) === 'player1' ? 'left' : 'right') {
+                    // Forward the action to the opponent
+                    opponent.send(JSON.stringify(data));
                 }
             } else {
                 // Forward other message types directly

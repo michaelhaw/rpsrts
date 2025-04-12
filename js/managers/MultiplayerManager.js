@@ -2,11 +2,14 @@ class MultiplayerManager {
     constructor() {
         this.ws = null;
         this.playerId = null;
-        this.gameScene = null;
-        this.connected = false;
+        this.isInitialized = false;
         this.gameStarted = false;
-        this.messageQueue = [];
-        this.eventListeners = new Map();
+        this.opponentDisconnected = false;
+        this.side = null; // 'left' or 'right'
+        this.opponentSide = null; // 'right' or 'left'
+
+        // Set up event listeners for game actions
+        this.setupEventListeners();
     }
 
     connect() {
@@ -17,17 +20,10 @@ class MultiplayerManager {
         const wsUrl = `${protocol}//${window.location.hostname}${port}`;
         
         this.ws = new WebSocket(wsUrl);
-
+        
         this.ws.onopen = () => {
-            console.log('Connected to server');
-            this.connected = true;
-            this.emit('connected');
-            
-            // Send any queued messages
-            while (this.messageQueue.length > 0) {
-                const msg = this.messageQueue.shift();
-                this.send(msg);
-            }
+            console.log('Connected to WebSocket server');
+            this.isInitialized = true;
         };
 
         this.ws.onmessage = (event) => {
@@ -36,110 +32,120 @@ class MultiplayerManager {
         };
 
         this.ws.onclose = () => {
-            console.log('Disconnected from server');
-            this.connected = false;
+            console.log('Disconnected from WebSocket server');
+            this.opponentDisconnected = true;
+            this.gameStarted = false;
+            this.isInitialized = false;
+            this.side = null;
+            this.opponentSide = null;
             this.emit('disconnected');
         };
 
         this.ws.onerror = (error) => {
             console.error('WebSocket error:', error);
-            this.emit('error', error);
         };
     }
 
+    // Check if player can control a specific side
+    canControl(side) {
+        return this.side === side;
+    }
+
     handleMessage(data) {
+        if (!this.isInitialized) return;
+
         switch (data.type) {
             case 'init':
                 this.playerId = data.playerId;
-                this.emit('playerAssigned', data.playerId);
+                // Assign sides based on player ID
+                this.side = data.playerId === 'player1' ? 'left' : 'right';
+                this.opponentSide = this.side === 'left' ? 'right' : 'left';
+                this.emit('playerAssigned', {
+                    playerId: this.playerId,
+                    side: this.side,
+                    opponentSide: this.opponentSide
+                });
                 break;
 
             case 'waiting':
-                this.emit('waiting');
+                this.emit('waitingForPlayer');
                 break;
 
             case 'gameStart':
                 this.gameStarted = true;
-                window.resetGameState(); // Reset game state when starting new game
                 this.emit('gameStart');
                 break;
 
             case 'gameAction':
-                const { action } = data;
-                switch (action.type) {
-                    case 'toggleBarrack':
-                        this.emit('toggleBarrack', action.barrackId);
-                        break;
-                    case 'usePowerup':
-                        this.emit('usePowerup', action.powerupType);
-                        break;
-                    case 'unitKilled':
-                        this.emit('unitKilled', action.killedBy);
-                        break;
-                    case 'gameOver':
-                        this.emit('gameOver', action.winner);
-                        break;
+                if (this.gameStarted) {
+                    // Only process actions if they're from our side
+                    if (data.action.side === this.side) {
+                        this.emit('gameAction', data.action);
+                    }
                 }
                 break;
 
             case 'opponentDisconnected':
-                this.emit('opponentDisconnected');
+                this.opponentDisconnected = true;
                 this.gameStarted = false;
+                this.emit('opponentDisconnected');
                 break;
 
-            case 'error':
-                this.emit('error', data.message);
+            default:
+                console.log('Unknown message type:', data.type);
                 break;
         }
     }
 
-    send(data) {
-        if (!this.connected) {
-            this.messageQueue.push(data);
-            return;
-        }
-
-        try {
-            this.ws.send(JSON.stringify(data));
-        } catch (e) {
-            console.error('Error sending message:', e);
-        }
-    }
-
-    // Game-specific action methods
+    // Game action methods
     toggleBarrack(barrackId) {
-        this.sendGameAction({
-            type: 'toggleBarrack',
-            barrackId
-        });
+        if (!this.gameStarted || !this.canControl(this.side)) return;
+        
+        this.ws.send(JSON.stringify({
+            type: 'gameAction',
+            action: {
+                type: 'toggleBarrack',
+                side: this.side,
+                barrackId
+            }
+        }));
     }
 
     usePowerup(powerupType) {
-        this.sendGameAction({
-            type: 'usePowerup',
-            powerupType
-        });
+        if (!this.gameStarted || !this.canControl(this.side)) return;
+        
+        this.ws.send(JSON.stringify({
+            type: 'gameAction',
+            action: {
+                type: 'usePowerup',
+                side: this.side,
+                powerupType
+            }
+        }));
     }
 
     reportUnitKilled(killedBy) {
-        this.sendGameAction({
-            type: 'unitKilled',
-            killedBy
-        });
+        if (!this.gameStarted) return;
+        
+        this.ws.send(JSON.stringify({
+            type: 'gameAction',
+            action: {
+                type: 'unitKilled',
+                side: killedBy === this.side ? this.opponentSide : this.side
+            }
+        }));
     }
 
     reportGameOver(winner) {
-        this.sendGameAction({
-            type: 'gameOver',
-            winner
-        });
-    }
-
-    sendGameAction(action) {
-        this.send({
+        if (!this.gameStarted) return;
+        
+        this.ws.send(JSON.stringify({
             type: 'gameAction',
-            action
-        });
+            action: {
+                type: 'gameOver',
+                winner
+            }
+        }));
     }
 
     on(event, callback) {
@@ -156,22 +162,8 @@ class MultiplayerManager {
         }
     }
 
-    isPlayer1() {
-        return this.playerId === 'player1';
-    }
-
-    isPlayer2() {
-        return this.playerId === 'player2';
-    }
-
-    isMyTurn() {
-        return this.gameStarted; // Both players can act simultaneously
-    }
-
-    disconnect() {
-        if (this.ws) {
-            this.ws.close();
-        }
+    setupEventListeners() {
+        this.eventListeners = new Map();
     }
 }
 
